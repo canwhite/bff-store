@@ -75,6 +75,25 @@ tsup.config.ts 定义了 5 个独立的构建入口：
 
 这些文件**只会被** `jsonl-entry.ts`、`mongodb-entry.ts`、`server/entry.ts` 引用，不会被主入口 `index.ts` 引用。
 
+### 为什么 index.ts 不引用 fs/mongodb 很重要？
+
+**不是"空间换时间"，是避免运行时错误。**
+
+tsup 的 `external` 配置是保险，但 `import` 语句本身就会触发模块解析：
+
+```typescript
+// index.ts 如果这样写
+import * as fs from 'fs';  // ← 加了这行
+export { createStore } from './createStore';
+```
+
+1. tsup external 会让 fs 代码不打包进 bundle
+2. 但 bundler（webpack/rollup）看到 `import` 语句仍会尝试解析
+3. Next.js 环境有 node_modules/fs → 解析成功，但运行时会出问题
+4. 纯浏览器环境没有 fs → 运行时直接报错
+
+**不让源头存在，比靠 external 兜底更安全。**
+
 ---
 
 ## 5. createNodeStore 的安全性
