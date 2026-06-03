@@ -33,3 +33,10 @@ export { HttpTransport, createStorageFromTransport } from './storage/transport';
 export { RestStorageProtocol, createStorageWithProtocol } from './storage/protocol';
 export type { TransportAdapter } from './storage/transport';
 export type { StorageHttpProtocol } from './storage/protocol';
+
+// ========================================
+// Node.js Utilities
+// ========================================
+
+export { isNode, isBrowser } from './environment';
+export { createNodeStore } from './nodeStore';

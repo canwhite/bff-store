@@ -124,20 +124,49 @@ await startServer({
 如果不通过 BFF，可以直接在 Node.js 中使用存储适配器：
 
 ```typescript
-import { createStore } from 'bff-store';
+import { createNodeStore, getDefaultStore } from 'bff-store';
 import { jsonlStorage } from 'bff-store/jsonl';
 import { mongodbStorage } from 'bff-store/mongodb';
 
 // 使用 JSONL
-const adapter = jsonlStorage({ dir: './sessions' });
-
-// 使用 MongoDB
-const adapter = await mongodbStorage({
-  url: 'mongodb://localhost:27017',
-  database: 'myapp',
+const store = createNodeStore('entity-123', [
+  { key: 'theme', defaultValue: 'dark' },
+  { key: 'count', defaultValue: 0 },
+], {
+  storage: jsonlStorage({ dir: './sessions' }),
 });
 
-const store = createStore('entity-123', config, { storage: adapter });
+// 等待初始加载完成
+await store.waitForLoad();
+
+// 使用 jotai getDefaultStore() 读写
+const jotai = getDefaultStore();
+jotai.set(store.atoms.theme, 'light');   // 自动 debounce 持久化
+console.log(jotai.get(store.atoms.count));
+
+// 或使用 MongoDB
+const store2 = createNodeStore('entity-456', [
+  { key: 'data', defaultValue: null },
+], {
+  storage: await mongodbStorage({
+    url: 'mongodb://localhost:27017',
+    database: 'myapp',
+  }),
+});
+```
+
+### 环境检测
+
+```typescript
+import { isNode, isBrowser } from 'bff-store';
+
+if (isNode()) {
+  // Node.js 环境
+}
+
+if (isBrowser()) {
+  // 浏览器环境
+}
 ```
 
 ## API Endpoints (BFF Server)
@@ -213,7 +242,7 @@ Note: Storage backend is configured by the client via `remoteStorage()` options,
 
 | Export | Description | Environment |
 |--------|-------------|-------------|
-| `bff-store` | Main entry: createStore, useStore, memoryStorage, remoteStorage | Browser + Node.js |
+| `bff-store` | Main entry: createStore, useStore, createNodeStore, isNode, isBrowser, memoryStorage, remoteStorage | Browser + Node.js |
 | `bff-store/jsonl` | JSONL storage adapter | Node.js only |
 | `bff-store/mongodb` | MongoDB storage adapter | Node.js only |
 | `bff-store/server` | BFF server (startServer, Router, etc.) | Node.js only |
