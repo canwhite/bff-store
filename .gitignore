@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+CLAUDE.md
+
+# Build output
+dist/
+
+tests/next_test
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+
+# Test data
+test-data/
+.test-server-data/

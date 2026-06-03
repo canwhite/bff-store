@@ -1,0 +1,62 @@
+{
+  "name": "bff-store",
+  "version": "0.1.0",
+  "description": "A jotai-based state management library with pluggable storage adapters",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./jsonl": {
+      "types": "./dist/storage/jsonl-entry.d.ts",
+      "import": "./dist/storage/jsonl-entry.mjs",
+      "require": "./dist/storage/jsonl-entry.js"
+    },
+    "./mongodb": {
+      "types": "./dist/storage/mongodb-entry.d.ts",
+      "import": "./dist/storage/mongodb-entry.mjs",
+      "require": "./dist/storage/mongodb-entry.js"
+    },
+    "./server": {
+      "types": "./dist/server/entry.d.ts",
+      "import": "./dist/server/entry.mjs",
+      "require": "./dist/server/entry.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup && cp package.json dist/package.json && node scripts/adapt-dist-package.js && for f in dist/*.d.mts; do cp \"$f\" \"${f%.d.mts}.d.ts\"; done",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "start": "node dist/server/cli.js"
+  },
+  "keywords": [
+    "jotai",
+    "state-management",
+    "react",
+    "storage"
+  ],
+  "peerDependencies": {
+    "jotai": ">=2.0.0",
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.2.16",
+    "jotai": "^2.6.0",
+    "jsdom": "^29.1.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "mongodb": "^6.21.0"
+  }
+}
