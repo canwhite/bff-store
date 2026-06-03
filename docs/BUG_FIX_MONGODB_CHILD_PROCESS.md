@@ -74,3 +74,56 @@ next_test/node_modules/mongodb/   ← 被安装了
 **修复后验证**：
 - next_test 重新 `npm install` 后，`node_modules/mongodb` 不存在
 - Next.js 构建成功，无 `child_process` 错误
+
+---
+
+## 问题二：Can't resolve 'bff-store'
+
+**日期**: 2026-06-03
+
+### 问题现象
+
+Next.js dev 时报错：
+```
+Module not found: Can't resolve 'bff-store'
+import { createStore, useStore, remoteStorage } from 'bff-store';
+```
+
+### 根因分析
+
+`package.json` exports 的 `require` 字段指向不存在的文件：
+
+```json
+"exports": {
+  ".": {
+    "types": "./dist/index.d.ts",
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.js"  // ← 这个文件不存在！
+  }
+}
+```
+
+tsup 只生成 ESM（`.mjs`），没有生成 CJS（`.js`）。但 exports 里写了 `require` 字段指向 `index.js`，Node.js CJS resolver 尝试解析时找不到文件就报错了。
+
+### 修复
+
+移除 exports 中的 `require` 字段（ESM-only 库）：
+
+```json
+"exports": {
+  ".": {
+    "types": "./dist/index.d.ts",
+    "import": "./dist/index.mjs"
+  }
+}
+```
+
+### ESM-only 的影响
+
+| 方式 | 支持 |
+|------|------|
+| `import from 'bff-store'` | ✅ 正常 |
+| `node --input-type=module` + import | ✅ 正常 |
+| `const x = require('bff-store')` | ❌ 报错 |
+
+bff-store 主打 React + 新项目，用 ESM 语法不受影响。老项目用 `require` 的场景暂不支持。
