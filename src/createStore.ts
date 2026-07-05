@@ -3,6 +3,13 @@ import type { StorageAdapter } from './storage/base';
 import { createPersistedAtom } from './atomCreator';
 
 /**
+ * Module-level promise for the auto-started server.
+ * Shared across all createStore calls so concurrent invocations
+ * wait on the same server instance.
+ */
+let serverInitPromise: Promise<unknown> | null = null;
+
+/**
  * Creates a store with multiple persisted atoms
  *
  * @param entityId - Unique identifier for this store instance
@@ -36,9 +43,11 @@ export function createStore(
 
   // Auto-start embedded server when using remote storage (Node.js only)
   // In browser/Next.js environments, remoteStorage connects to an already-running BFF server
+  // serverInitPromise is module-level so concurrent createStore calls share the same promise
   if (adapter?.name === 'remote' && typeof window === 'undefined' && typeof process !== 'undefined') {
     import('./server').then(({ startServer }) => {
-      startServer().catch((err) => {
+      // startServer is a singleton; concurrent calls share the same promise
+      serverInitPromise = startServer().then(() => void 0).catch((err) => {
         console.error('[bff-store] Failed to auto-start server:', err);
       });
     });
@@ -74,4 +83,13 @@ export function createStore(
     atoms,
     loadingAtoms,
   };
+}
+
+/**
+ * Wait for the auto-started server to be ready.
+ * Only meaningful when using remote storage in Node.js;
+ * returns a resolved promise in browser environments.
+ */
+export function waitForServer(): Promise<void> | undefined {
+  return serverInitPromise as Promise<void> | undefined;
 }

@@ -81,8 +81,8 @@ async function getCachedStorage(config: BackendConfig, entityId?: string): Promi
     return entry.adapter.storage;
   }
 
-  // Evict oldest if cache is full
-  if (storageCache.size >= MAX_CACHE_SIZE) {
+  // Evict oldest entries until there's space for a new one
+  while (storageCache.size >= MAX_CACHE_SIZE && storageCache.size > 0) {
     let oldestKey: string | null = null;
     let oldestTime = Infinity;
     for (const [k, entry] of storageCache.entries()) {
@@ -93,6 +93,8 @@ async function getCachedStorage(config: BackendConfig, entityId?: string): Promi
     }
     if (oldestKey) {
       storageCache.delete(oldestKey);
+    } else {
+      break; // should not happen, but guard against infinite loop
     }
   }
 

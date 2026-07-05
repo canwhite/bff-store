@@ -21,7 +21,14 @@ export class HttpTransport implements TransportAdapter {
   async get<T>(url: string): Promise<T> {
     const res = await fetch(url);
     if (!res.ok) {
-      throw new Error(`GET ${url} failed: ${res.statusText}`);
+      let detail = res.statusText;
+      try {
+        const body = await res.clone().json();
+        detail = body?.error ?? body?.message ?? detail;
+      } catch {
+        // body is not JSON or unreadable, use statusText only
+      }
+      throw new Error(`GET ${url} failed: ${detail}`);
     }
     return res.json();
   }
@@ -33,7 +40,14 @@ export class HttpTransport implements TransportAdapter {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      throw new Error(`POST ${url} failed: ${res.statusText}`);
+      let detail = res.statusText;
+      try {
+        const errBody = await res.clone().json();
+        detail = errBody?.error ?? errBody?.message ?? detail;
+      } catch {
+        // body is not JSON or unreadable, use statusText only
+      }
+      throw new Error(`POST ${url} failed: ${detail}`);
     }
     return res.json();
   }
@@ -41,7 +55,14 @@ export class HttpTransport implements TransportAdapter {
   async delete(url: string): Promise<void> {
     const res = await fetch(url, { method: 'DELETE' });
     if (!res.ok) {
-      throw new Error(`DELETE ${url} failed: ${res.statusText}`);
+      let detail = res.statusText;
+      try {
+        const errBody = await res.clone().json();
+        detail = errBody?.error ?? errBody?.message ?? detail;
+      } catch {
+        // body is not JSON or unreadable, use statusText only
+      }
+      throw new Error(`DELETE ${url} failed: ${detail}`);
     }
   }
 }

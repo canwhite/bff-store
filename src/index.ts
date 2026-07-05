@@ -2,7 +2,7 @@
 // Main Export
 // ========================================
 
-export { createStore } from './createStore';
+export { createStore, waitForServer } from './createStore';
 export { useStore } from './useStore';
 export { createPersistedAtom } from './atomCreator';
 

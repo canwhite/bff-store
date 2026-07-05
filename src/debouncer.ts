@@ -47,8 +47,11 @@ export class DebouncerMap {
 
   getDebouncer(key: string, ms?: number): Debouncer {
     let debouncer = this.debouncers.get(key);
-    if (!debouncer) {
-      debouncer = createDebouncer(ms ?? this.defaultMs);
+    const effectiveMs = ms ?? this.defaultMs;
+
+    // Create new debouncer if none exists, or if ms differs from existing one
+    if (!debouncer || debouncer.ms !== effectiveMs) {
+      debouncer = createDebouncer(effectiveMs);
       this.debouncers.set(key, debouncer);
     }
     return debouncer;
