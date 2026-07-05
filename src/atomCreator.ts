@@ -30,14 +30,22 @@ export function createPersistedAtom<T>(
           setValue(value);
         }
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(`[bff-store] Failed to load atom "${config.key}":`, err);
+      })
       .finally(() => {
-        // Mark as loaded
+        // Mark as loaded regardless of success or failure
         setTimeout(() => {
           const store = getDefaultStore();
           store.set(loadingAtom, false);
         }, 0);
       });
+
+    // Cancel pending debounced write on unmount to avoid writes from a destroyed component
+    return () => {
+      const debounceKey = `${entityId}:${config.key}`;
+      debouncerMap.cancel(debounceKey);
+    };
   };
 
   // Create write atom with persistence

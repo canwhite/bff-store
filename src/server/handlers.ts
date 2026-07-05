@@ -237,7 +237,7 @@ export function createStorageHandlers(options: StorageHandlersOptions) {
     res.end(JSON.stringify({ success: true }));
   }
 
-  async function handleHealth(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  async function handleHealth(_req: IncomingMessage, res: ServerResponse): Promise<void> {
     res.setHeader('Content-Type', 'application/json');
     res.writeHead(200);
     res.end(JSON.stringify({ status: 'ok' }));
