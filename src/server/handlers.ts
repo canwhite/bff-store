@@ -125,26 +125,6 @@ async function getCachedStorage(config: BackendConfig, entityId?: string): Promi
   return adapter.storage;
 }
 
-async function getStorageForRequest(
-  req: IncomingMessage,
-  entityId?: string
-): Promise<Storage> {
-  const urlConfig = getBackendConfig(req);
-  const body = await parseBody<BackendConfig>(req);
-
-  const config: BackendConfig = {
-    backend: body.backend ?? urlConfig.backend,
-    mongoUrl: body.mongoUrl ?? urlConfig.mongoUrl,
-    mongoDb: body.mongoDb ?? urlConfig.mongoDb,
-    jsonlDir: body.jsonlDir ?? urlConfig.jsonlDir,
-  };
-
-  // Periodic cleanup of expired cache entries
-  cleanExpiredCache();
-
-  return getCachedStorage(config, entityId);
-}
-
 export function createStorageHandlers(options: StorageHandlersOptions) {
   const { getStorage } = options;
 
@@ -159,7 +139,8 @@ export function createStorageHandlers(options: StorageHandlersOptions) {
       try {
         body = await parseBody<Record<string, unknown>>(req);
       } catch {
-        // Ignore parse errors
+        // Ignore parse errors - fall back to urlConfig only
+        console.warn('[bff-store] Failed to parse request body, using URL config only');
       }
     }
 

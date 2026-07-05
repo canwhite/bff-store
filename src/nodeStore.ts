@@ -44,7 +44,7 @@ export function createNodeStore(
   const store = createStore(entityId, config, options);
   const jotaiStore = getDefaultStore();
 
-  async function waitForLoad(): Promise<void> {
+  async function waitForLoad(timeoutMs: number = 5000): Promise<void> {
     // Trigger onMount for all atoms by subscribing to them
     // In Node.js, sub() triggers onMount (unlike get() which doesn't)
     for (const atom of Object.values(store.atoms)) {
@@ -52,7 +52,7 @@ export function createNodeStore(
     }
 
     // Now wait for all loading atoms to become false
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const loadingAtoms = Object.values(store.loadingAtoms);
       const stillLoading = () => loadingAtoms.some((atom) => jotaiStore.get(atom));
 
@@ -61,10 +61,17 @@ export function createNodeStore(
         return;
       }
 
+      // Timeout protection
+      const timeout = setTimeout(() => {
+        clearInterval(interval);
+        reject(new Error(`waitForLoad timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
       // Poll until all are loaded
       const interval = setInterval(() => {
         if (!stillLoading()) {
           clearInterval(interval);
+          clearTimeout(timeout);
           resolve();
         }
       }, 10);

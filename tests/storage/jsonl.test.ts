@@ -79,14 +79,30 @@ describe('jsonlStorage', () => {
       expect(await adapter2.storage.get('key')).toBe('value2');
     });
 
-    it('should sanitize key in filename', async () => {
+    it('should encode key in filename to avoid collision', async () => {
       const adapter = jsonlStorage({ dir: testDir });
       adapter.setEntityId('entity1');
 
       await adapter.storage.set('key with spaces', 'value');
 
-      const filePath = path.join(testDir, 'entity1', 'key_with_spaces.jsonl');
+      // encodeURIComponent converts " " → "%20", producing a collision-safe filename
+      const filePath = path.join(testDir, 'entity1', 'key%20with%20spaces.jsonl');
       expect(fs.existsSync(filePath)).toBe(true);
+    });
+
+    it('should not collide on keys with dots and hyphens', async () => {
+      const adapter = jsonlStorage({ dir: testDir });
+      adapter.setEntityId('entity1');
+
+      await adapter.storage.set('user.name', 'value1');
+      await adapter.storage.set('user-name', 'value2');
+
+      const filePath1 = path.join(testDir, 'entity1', 'user.name.jsonl');
+      const filePath2 = path.join(testDir, 'entity1', 'user-name.jsonl');
+      expect(fs.existsSync(filePath1)).toBe(true);
+      expect(fs.existsSync(filePath2)).toBe(true);
+      expect(await adapter.storage.get('user.name')).toBe('value1');
+      expect(await adapter.storage.get('user-name')).toBe('value2');
     });
 
     it('should handle multiple types', async () => {

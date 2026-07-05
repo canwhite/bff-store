@@ -29,7 +29,9 @@ export function jsonlStorage(options?: JsonlStorageOptions): JsonlStorageInstanc
   let entityId: string = 'default';
 
   function getFilePath(eId: string, key: string): string {
-    const safeKey = key.replace(/[^a-zA-Z0-9_]/g, '_');
+    // Use encodeURIComponent to avoid key collision:
+    // "user.name", "user-name", "user%2Ename" all produce distinct filenames
+    const safeKey = encodeURIComponent(key);
     return path.join(baseDir, eId, `${safeKey}.jsonl`);
   }
 
