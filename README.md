@@ -12,6 +12,7 @@ A jotai-based state management library with pluggable storage adapters and a bui
 - **Built-in BFF**: Embedded sidecar API server for browser/Next.js environments
 - **Multi-tenant**: Per-entityId isolation via `setEntityId()`
 - **Unmount cleanup**: Pending writes cancelled on component unmount
+- **Embedded Sidecar**: Like a serverless function that auto-starts on first use — no manual server deployment required
 
 ## Architecture
 
@@ -45,6 +46,31 @@ A jotai-based state management library with pluggable storage adapters and a bui
 2. **Read**: `useStore()` returns from jotai store directly — no I/O
 3. **Write**: Update local jotai atom first (sync UI response), then debounce-persist to storage
 4. **Unmount**: Automatically cancel pending writes to prevent writes from destroyed components
+
+## Embedded Sidecar Pattern
+
+bff-store borrows the **embedded sidecar** pattern from microservices: the BFF server is co-located with your application process, auto-started on first use, with the lifecycle managed transparently.
+
+| Aspect | Classic Microservice Sidecar | bff-store Embedded Sidecar |
+|--------|----------------------------|--------------------------|
+| Deployment | Separate container, same pod | In-process, same Node.js process |
+| Startup | Kubernetes orchestrates | `createStore()` triggers `import('./server')` |
+| Singleton | One per pod | One per process (singleton `startServer`) |
+| State | External DB / volume | JSONL / MongoDB |
+| Scaling | Horizontal pod scaling | Multiple store instances share one server |
+| Cold start | Pod scheduling overhead | Module import + server listen (~100ms) |
+
+This gives you the **transparency of serverless** (no manual server deployment) with the **control of a long-running process** (full backend, no 100ms timeout, no cold starts after first invocation).
+
+### How it compares to serverless
+
+| | Serverless (Lambda) | bff-store Sidecar |
+|--|---------------------|-------------------|
+| Cold start | 100ms–1s (platform) | ~100ms (import + listen) |
+| State | External KV store (S3/Dynamo) | JSONL / MongoDB (local) |
+| Concurrency | One invocation per instance | All stores share one server |
+| Tenant isolation | Separate functions | Separate collections / directories |
+| Failure mode | Invocation fails | Server restarts, pending writes lost (mitigated by unmount cancel) |
 
 ## Installation
 
