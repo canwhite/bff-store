@@ -1,41 +1,50 @@
 # bff-store
 
-A jotai-based state management library with pluggable storage adapters and built-in BFF (Backend for Frontend) for browser/Next.js environments.
+A jotai-based state management library with pluggable storage adapters and a built-in BFF (Backend for Frontend) for browser/Next.js environments.
 
 ## Features
 
 - **Configuration-driven**: Define multiple states via array configuration
-- **Pluggable storage**: Use memory, JSONL files, MongoDB, or remote server
+- **Pluggable storage**: Use memory, JSONL files, MongoDB, or a remote server
 - **Auto-generated hooks**: React hooks auto-generated from config
 - **Loading states**: Built-in loading state tracking
-- **Debounced saves**: Automatic debouncing for non-critical data
+- **Debounced saves**: Automatic debouncing for non-critical data (800ms default)
 - **Built-in BFF**: Embedded sidecar API server for browser/Next.js environments
+- **Multi-tenant**: Per-entityId isolation via `setEntityId()`
+- **Unmount cleanup**: Pending writes cancelled on component unmount
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Your Application                       │
-│                   (Next.js/Browser)                      │
-│                                                          │
-│  useStore() ──► remoteStorage ──► localhost:3847        │
-│                         │                                │
-│                         ▼                                │
-│              ┌─────────────────────┐                     │
-│              │   BFF (Sidecar)     │                     │
-│              │  bff-store │                     │
-│              │                     │                     │
-│              │  /storage/get/:key  │                     │
-│              │  /storage/set/:key  │                     │
-│              │  /storage/delete   │                     │
-│              └──────────┬──────────┘                     │
-│                         │                                │
-│                         ▼                                │
-│              ┌─────────────────────┐                     │
-│              │   JSONL / MongoDB   │                     │
-│              └─────────────────────┘                     │
+│                    Your Application                      │
+│                   (Next.js / Browser)                   │
+│                                                         │
+│  useStore() ──► remoteStorage ──► localhost:3847      │
+│                         │                               │
+│                         ▼                               │
+│              ┌─────────────────────┐                  │
+│              │     BFF (Sidecar)    │                  │
+│              │                     │                  │
+│              │  /storage/get/:key  │                  │
+│              │  /storage/set/:key  │                  │
+│              │  /storage/batch-*   │                  │
+│              └──────────┬──────────┘                  │
+│                         │                               │
+│                         ▼                               │
+│              ┌─────────────────────┐                  │
+│              │   JSONL / MongoDB   │                  │
+│              │    (multi-tenant)    │                  │
+│              └─────────────────────┘                  │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### Data Flow
+
+1. **Init**: `createStore()` creates atoms, `remoteStorage` auto-starts the BFF server
+2. **Read**: `useStore()` returns from jotai store directly — no I/O
+3. **Write**: Update local jotai atom first (sync UI response), then debounce-persist to storage
+4. **Unmount**: Automatically cancel pending writes to prevent writes from destroyed components
 
 ## Installation
 
@@ -47,7 +56,7 @@ pnpm add bff-store
 
 ## Client Usage (Browser / Next.js)
 
-BFF Server 会自动启动，客户端只需使用 `remoteStorage()` 并指定存储后端：
+The BFF server starts automatically. Use `remoteStorage()` to specify the storage backend:
 
 ```typescript
 import { createStore, useStore, remoteStorage } from 'bff-store';
@@ -55,9 +64,10 @@ import { createStore, useStore, remoteStorage } from 'bff-store';
 const config = [
   { key: 'theme', defaultValue: 'dark' },
   { key: 'characters', defaultValue: [] },
+  { key: 'settings', defaultValue: {}, immediate: true },  // persist immediately, no debounce
 ] as const;
 
-// 使用 MongoDB 存储
+// Using MongoDB
 const store = createStore('my-app', config, {
   storage: remoteStorage({
     backend: 'mongodb',
@@ -66,7 +76,7 @@ const store = createStore('my-app', config, {
   }),
 });
 
-// 或使用 JSONL 存储
+// Or using JSONL
 // const store = createStore('my-app', config, {
 //   storage: remoteStorage({
 //     backend: 'jsonl',
@@ -75,60 +85,75 @@ const store = createStore('my-app', config, {
 // });
 ```
 
-### 在 React 组件中使用
+### In a React Component
 
 ```typescript
 function App() {
-  const { theme, setTheme, isLoading } = useStore(store);
+  const { theme, setTheme, characters, setCharacters, isLoading } = useStore(store);
 
   if (isLoading) return <div>Loading...</div>;
 
-  return <input value={theme} onChange={e => setTheme(e.target.value)} />;
+  return (
+    <input value={theme} onChange={e => setTheme(e.target.value)} />
+  );
 }
 ```
 
-### 自定义 BFF 服务器地址
+### Immediate Persistence (no debounce)
+
+For critical data, use `immediate: true`:
 
 ```typescript
-// 如果 BFF 运行在其他地址
-const adapter = remoteStorage({ baseUrl: 'http://localhost:3847' });
-const adapter = remoteStorage({ entityId: 'user-123' });  // 多租户支持
+const config = [
+  { key: 'autosave', defaultValue: '', immediate: true },
+] as const;
 ```
 
-### Memory Storage (不持久化)
+### Waiting for the Server
 
-适用于开发环境或不需要持久化的场景：
+`createStore` is synchronous, but server startup is asynchronous. Optionally wait:
+
+```typescript
+import { createStore, waitForServer } from 'bff-store';
+
+const store = createStore('my-app', config, { storage: adapter });
+await waitForServer();
+```
+
+### Multi-Tenant Switching
+
+Switch tenants dynamically via `setEntityId`:
+
+```typescript
+const adapter = remoteStorage({ entityId: 'tenant-A' });
+const store = createStore('tenant-A', config, { storage: adapter });
+
+// Switch tenant
+adapter.setEntityId('tenant-B');
+```
+
+### Memory Storage (non-persistent)
+
+For development or non-persistent use cases:
 
 ```typescript
 import { createStore, useStore, memoryStorage } from 'bff-store';
 
 const store = createStore('my-app', config, {
-  storage: memoryStorage(),  // 不走 BFF，数据仅存在内存
+  storage: memoryStorage(),  // data lives only in memory
 });
 ```
 
-## Advanced: 手动启动 BFF Server
+## Node.js Direct Storage Adapter Usage
 
-大多数情况不需要手动启动 BFF，它会自动启动。如需手动控制：
-
-```typescript
-import { startServer } from 'bff-store/server';
-
-await startServer({
-  port: 3847,
-});
-```
-
-## Node.js 直接使用 Storage Adapters
-
-如果不通过 BFF，可以直接在 Node.js 中使用存储适配器：
+You can also use storage adapters directly in Node.js without the BFF:
 
 ```typescript
 import { createNodeStore, getDefaultStore } from 'bff-store';
 import { jsonlStorage } from 'bff-store/jsonl';
 import { mongodbStorage } from 'bff-store/mongodb';
 
-// 使用 JSONL
+// Using JSONL
 const store = createNodeStore('entity-123', [
   { key: 'theme', defaultValue: 'dark' },
   { key: 'count', defaultValue: 0 },
@@ -136,15 +161,15 @@ const store = createNodeStore('entity-123', [
   storage: jsonlStorage({ dir: './sessions' }),
 });
 
-// 等待初始加载完成
+// Wait for initial load (5s timeout)
 await store.waitForLoad();
 
-// 使用 jotai getDefaultStore() 读写
+// Read/write via jotai getDefaultStore()
 const jotai = getDefaultStore();
-jotai.set(store.atoms.theme, 'light');   // 自动 debounce 持久化
+jotai.set(store.atoms.theme, 'light');   // auto-debounce persists
 console.log(jotai.get(store.atoms.count));
 
-// 或使用 MongoDB
+// Or using MongoDB
 const store2 = createNodeStore('entity-456', [
   { key: 'data', defaultValue: null },
 ], {
@@ -155,19 +180,31 @@ const store2 = createNodeStore('entity-456', [
 });
 ```
 
-### 环境检测
+### Environment Detection
 
 ```typescript
 import { isNode, isBrowser } from 'bff-store';
 
-if (isNode()) {
-  // Node.js 环境
-}
-
-if (isBrowser()) {
-  // 浏览器环境
-}
+if (isNode()) { /* Node.js */ }
+if (isBrowser()) { /* Browser */ }
 ```
+
+## Storage Backends
+
+### JSONL
+
+File format: `{dir}/{entityId}/{encodeURIComponent(key)}.jsonl`
+
+Each line is a JSON object with timestamp. `get` reads the last line for the latest value.
+
+### MongoDB
+
+Collection name: `state_{entityId}`. Each key uses upsert — only the latest value is kept.
+
+> For production, create a compound index on `key + entityId`:
+> ```javascript
+> db.state_<entityId>.createIndex({ key: 1, entityId: 1 }, { unique: true })
+> ```
 
 ## API Endpoints (BFF Server)
 
@@ -191,9 +228,18 @@ Creates a store with multiple persisted atoms.
 - `options.storage`: Storage adapter (required)
 - `options.debounceMs`: Debounce delay in ms (default: 800)
 
+### `waitForServer()`
+
+Returns a promise that resolves when the auto-started BFF server is ready. Only meaningful in Node.js with `remoteStorage`.
+
+```typescript
+import { waitForServer } from 'bff-store';
+await waitForServer();
+```
+
 ### `useStore(store)`
 
-React hook to use the store in components.
+React hook to consume the store in components.
 
 Returns: `{ ...data, ...setters, isLoading }`
 
@@ -201,26 +247,39 @@ Setter names are derived by capitalizing the config key:
 - `theme` → `setTheme`
 - `userName` → `setUserName`
 
+### `createNodeStore(entityId, config, options)`
+
+Node.js environment store with `waitForLoad()`.
+
+```typescript
+const store = createNodeStore('entity-123', config, { storage: adapter });
+await store.waitForLoad();  // 5s timeout
+```
+
 ### `remoteStorage(options?)`
 
 Creates a remote storage adapter for connecting to the BFF server.
 
 ```typescript
-// 基本用法 - BFF 使用默认存储后端
+// Basic
 const adapter = remoteStorage();
 
-// 指定使用 MongoDB
+// Use MongoDB
 const adapter = remoteStorage({
   backend: 'mongodb',
   mongoUrl: 'mongodb://user:pass@host:27017',
   mongoDb: 'myapp',
 });
 
-// 指定使用 JSONL
+// Use JSONL
 const adapter = remoteStorage({
   backend: 'jsonl',
   jsonlDir: '/tmp/my-app-data',
 });
+
+// Multi-tenant
+const adapter = remoteStorage({ entityId: 'user-123' });
+adapter.setEntityId('user-456');  // switch tenant
 ```
 
 - `options.baseUrl`: BFF server URL (default: `http://localhost:3847`)
@@ -228,24 +287,43 @@ const adapter = remoteStorage({
 - `options.backend`: Storage backend type `'mongodb'` or `'jsonl'`
 - `options.mongoUrl`: MongoDB connection URL (required if backend is mongodb)
 - `options.mongoDb`: MongoDB database name (default: `jotai_state_store`)
-- `options.jsonlDir`: JSONL storage directory (required if backend is jsonl)
+- `options.jsonlDir`: JSONL storage directory (default: `./data`)
 
 ### `startServer(options)`
 
 Starts the BFF server (singleton pattern). Import from `bff-store/server`.
 
-- `options.port`: Server port (default: 3847)
+```typescript
+import { startServer } from 'bff-store/server';
 
-Note: Storage backend is configured by the client via `remoteStorage()` options, not by the server.
+await startServer({
+  port: 3847,
+  backend: 'jsonl',
+  jsonlDir: './data',
+});
+```
 
 ## Package Exports
 
 | Export | Description | Environment |
 |--------|-------------|-------------|
-| `bff-store` | Main entry: createStore, useStore, createNodeStore, isNode, isBrowser, memoryStorage, remoteStorage | Browser + Node.js |
+| `bff-store` | Main: createStore, useStore, createNodeStore, waitForServer, isNode, isBrowser, memoryStorage, remoteStorage | Browser + Node.js |
 | `bff-store/jsonl` | JSONL storage adapter | Node.js only |
-| `bff-store/mongodb` | MongoDB storage adapter | Node.js only |
-| `bff-store/server` | BFF server (startServer, Router, etc.) | Node.js only |
+| `bff-store/mongodb` | MongoDB storage adapter (async factory) | Node.js only |
+| `bff-store/server` | BFF server: startServer, Router, EntityIdCache | Node.js only |
+
+## Changelog
+
+### v0.1.1 (2026-07-05)
+
+- `createStore` with `remote` storage now waits for server startup to complete
+- `waitForServer()` added for explicit server readiness
+- `remoteStorage.setEntityId()` now works correctly (live entityId reference)
+- MongoDB `set` uses upsert mode — no more unbounded document accumulation
+- JSONL key encoding changed to `encodeURIComponent` — prevents `a.b` / `a-b` collision
+- `atom.onMount` unmount cleanup cancels pending debounced writes
+- `waitForLoad()` now has a 5s timeout
+- HTTP error responses now include server-returned error details
 
 ## License
 

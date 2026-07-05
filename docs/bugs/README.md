@@ -1,6 +1,10 @@
 # Bug 索引
 
-Post-Mortem 2026-07-05 发现并修复的所有 bug。
+Post-Mortem 2026-07-05 四轮审查共发现 **18 个 bug**，**15 个已修复**。
+
+> High severity 文件名末尾标注 `.high`。
+
+## 已修复
 
 | # | Severity | File | Bug |
 |---|----------|------|-----|
@@ -19,8 +23,6 @@ Post-Mortem 2026-07-05 发现并修复的所有 bug。
 | 17 | Low | [17-unused-parameter.md](./17-unused-parameter.md) | `handleHealth` 未使用参数 |
 | 18 | Low | [18-storage-get-silent-error.md](./18-storage-get-silent-error.md) | `storage.get` 失败时静默忽略 |
 
----
-
 ## 未修复（设计选择）
 
 | # | Reason |
@@ -28,3 +30,6 @@ Post-Mortem 2026-07-05 发现并修复的所有 bug。
 | BUG-06 | module-level `debouncerMap` 通过 `entityId:key` 隔离键名，实际无跨 store 干扰 |
 | BUG-13 | `createStorageFromTransport.get` 所有错误返回 null — 符合 storage graceful degradation 哲学 |
 | BUG-16 | serverInitPromise 时序 — 符合 fire-and-forget 设计，`waitForServer()` 可供显式等待 |
+| BUG-19 | GET 请求解析 body — 无害 no-op |
+| BUG-20 | MongoDB 无复合索引 — 用户在数据库层处理 |
+| BUG-21 | `setTimeout` unmount 后触发 — 无害 side effect |
