@@ -60,12 +60,12 @@ export async function mongodbStorage(
     async set<T>(key: string, value: T): Promise<void> {
       const collection = getCollection(currentEntityId);
 
-      await collection.insertOne({
-        key,
-        value,
-        timestamp: Date.now(),
-        entityId: currentEntityId,
-      });
+      // Use upsert to avoid accumulating duplicate entries over time
+      await collection.updateOne(
+        { key, entityId: currentEntityId },
+        { $set: { value, timestamp: Date.now() } },
+        { upsert: true }
+      );
     },
 
     async remove(key: string): Promise<void> {

@@ -53,7 +53,8 @@ export function remoteStorage(options: RemoteStorageOptions = {}): StorageAdapte
     jsonlDir: options.jsonlDir,
   };
 
-  const protocol = options.protocol ?? new RestStorageProtocol(baseUrl, entityId.current, backendConfig);
+  // Pass the entityId object ref so getEntityId() reads the live value on each request
+  const protocol = options.protocol ?? new RestStorageProtocol(baseUrl, entityId, backendConfig);
   const storage = createStorageWithProtocol(transport, protocol);
 
   const adapter: StorageAdapter = {

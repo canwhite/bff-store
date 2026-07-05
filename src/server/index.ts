@@ -38,10 +38,6 @@ const defaultOptions: ServerOptions = {
   jsonlDir: './data',
 };
 
-function isServerRunning(): boolean {
-  return serverInstance !== null;
-}
-
 /**
  * Start the embedded API server (singleton).
  *
