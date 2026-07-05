@@ -1,6 +1,6 @@
 {
   "name": "bff-store",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A jotai-based state management library with pluggable storage adapters",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
